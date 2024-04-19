@@ -78,8 +78,10 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   encrypted_values.iv0 = c0_and_iv0.second;
   encrypted_values.iv1 = c1_and_iv1.second;
   network_driver->send(
-    crypto_driver->encrypt_and_tag(this->AES_key, this->HMAC_key, &encrypted_values)
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &encrypted_values)
   );
+
+  std::cout << "OT_send done" << std::endl;
 }
 
 /*
@@ -91,8 +93,11 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
  * Disconnect and throw errors only for invalid MACs
  */
 std::string OTDriver::OT_recv(int choice_bit) {
-  auto sender_data_and_ok = crypto_driver->decrypt_and_verify(this->AES_key, this->HMAC_key, network_driver->read());
+  auto sender_data_and_ok = crypto_driver->decrypt_and_verify(
+    AES_key, HMAC_key, network_driver->read()
+  );
   if (!sender_data_and_ok.second) {
+    network_driver->disconnect();
     throw std::runtime_error("Invalid MAC");
   }
   SenderToReceiver_OTPublicValue_Message sender_public_value;
@@ -115,22 +120,29 @@ std::string OTDriver::OT_recv(int choice_bit) {
     crypto_driver->encrypt_and_tag(this->AES_key, this->HMAC_key, &public_value)
   );
 
-  auto ciphertexts_data_and_ok = crypto_driver->decrypt_and_verify(this->AES_key, this->HMAC_key, network_driver->read());
+  auto ciphertexts_data_and_ok = crypto_driver->decrypt_and_verify(
+    AES_key, HMAC_key, network_driver->read()
+  );
   if (!ciphertexts_data_and_ok.second) {
     throw std::runtime_error("Invalid MAC");
   }
   SenderToReceiver_OTEncryptedValues_Message ciphertexts;
   ciphertexts.deserialize(ciphertexts_data_and_ok.first);
 
+
+  std::cout << "before key generation in recv" << std::endl;
   auto k = crypto_driver->AES_generate_key(
     integer_to_byteblock(
       CryptoPP::ModularExponentiation(A, b, DL_P)
     )
   );
+  std::cout << "before key generation in recv" << std::endl;
 
   if (choice_bit) {
+    std::cout << "decrypting e1" << std::endl;
     return crypto_driver->AES_decrypt(k, ciphertexts.iv1, ciphertexts.e1);
   } else {
+    std::cout << "decrypting e0" << std::endl;
     return crypto_driver->AES_decrypt(k, ciphertexts.iv0, ciphertexts.e0);
   }
 }
