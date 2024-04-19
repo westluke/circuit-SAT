@@ -69,6 +69,8 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   auto k0 = crypto_driver->AES_generate_key(integer_to_byteblock(B_to_the_a));
   auto k1 = crypto_driver->AES_generate_key(integer_to_byteblock(B_over_A_to_the_a));
   std::cout << "after key generation" << std::endl;
+  std::cout << B_to_the_a << std::endl;
+  std::cout << B_over_A_to_the_a << std::endl;
   auto c0_and_iv0 = crypto_driver->AES_encrypt(k0, m0);
   auto c1_and_iv1 = crypto_driver->AES_encrypt(k1, m1);
 
@@ -131,6 +133,7 @@ std::string OTDriver::OT_recv(int choice_bit) {
 
 
   std::cout << "before key generation in recv" << std::endl;
+  std::cout << CryptoPP::ModularExponentiation(A, b, DL_P) << std::endl;
   auto k = crypto_driver->AES_generate_key(
     integer_to_byteblock(
       CryptoPP::ModularExponentiation(A, b, DL_P)
