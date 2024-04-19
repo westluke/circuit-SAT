@@ -120,6 +120,8 @@ std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
     garbled.entries = entries;
     gates.push_back(garbled);
   }
+
+  return gates;
 }
 
 /**
