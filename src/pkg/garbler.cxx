@@ -77,8 +77,64 @@ GarblerClient::HandleKeyExchange() {
 std::string GarblerClient::run(std::vector<int> input) {
   // Key exchange
   auto keys = this->HandleKeyExchange();
+  auto AES_key = keys.first;
+  auto HMAC_key = keys.second;
 
-  // TODO: implement me!
+  auto labels = generate_labels(circuit);
+  auto gates = generate_gates(circuit, labels);
+
+  // Send garbled circuit
+  GarblerToEvaluator_GarbledTables_Message garbled_tables;
+  garbled_tables.garbled_tables = gates;
+  network_driver->send(
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &garbled_tables)
+  );
+
+  // Send garbler's input labels
+  GarblerToEvaluator_GarblerInputs_Message garbler_inputs;
+  garbler_inputs.garbler_inputs = get_garbled_wires(labels, input, 0);
+  network_driver->send(
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &garbler_inputs)
+  );
+
+  // Send evaluator's input labels using OT
+  std::vector<std::string> ot_outputs;
+  int begin = circuit.garbler_input_length;
+  for (int i = 0; i < circuit.evaluator_input_length; i++) {
+    ot_driver->OT_send(
+      byteblock_to_string(labels.zeros[i].value),
+      byteblock_to_string(labels.ones[i].value)
+    );
+  }
+
+  // Evaluator is evaluating...
+
+  // Receive final labels
+  auto final_labels_data_and_ok = crypto_driver->decrypt_and_verify(
+    AES_key, HMAC_key, network_driver->read()
+  );
+  if (!final_labels_data_and_ok.second) {
+    network_driver->disconnect();
+    throw std::runtime_error("Invalid MAC");
+  }
+  EvaluatorToGarbler_FinalLabels_Message final_labels;
+  final_labels.deserialize(final_labels_data_and_ok.first);
+
+  // Get final output
+  std::string final_output;
+  begin = circuit.num_wire - circuit.output_length;
+  for (int i = 0; i < circuit.output_length; i++) {
+    auto label = final_labels.final_labels[i].value;
+    if (label == labels.zeros[begin + i].value) {
+      final_output += "0";
+    } else if (label == labels.ones[begin + i].value) {
+      final_output += "1";
+    } else {
+      std::cerr << "Invalid output label sent by evaluator to garbler." << std::endl;
+    }
+  }
+
+  return final_output;
 }
 
 /**
@@ -134,6 +190,7 @@ GarbledLabels GarblerClient::generate_labels(Circuit circuit) {
     labels.zeros.push_back(GarbledWire{generate_label()});
     labels.ones.push_back(GarbledWire{generate_label()});
   }
+  return labels;
 }
 
 /**
