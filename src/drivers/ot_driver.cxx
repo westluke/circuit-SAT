@@ -49,11 +49,12 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   SenderToReceiver_OTPublicValue_Message public_value;
   public_value.public_value = std::get<1>(a_and_ga);
   network_driver->send(
-    crypto_driver->encrypt_and_tag(this->AES_key, this->HMAC_key, &public_value)
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &public_value)
   );
  
-  auto receiver_data_and_ok = crypto_driver->decrypt_and_verify(this->AES_key, this->HMAC_key, network_driver->read());
+  auto receiver_data_and_ok = crypto_driver->decrypt_and_verify(AES_key, HMAC_key, network_driver->read());
   if (!receiver_data_and_ok.second) {
+    network_driver->disconnect();
     throw std::runtime_error("Invalid MAC");
   }
   ReceiverToSender_OTPublicValue_Message receiver_public_value;
@@ -64,8 +65,10 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   auto inv_A = CryptoPP::EuclideanMultiplicativeInverse(A, DL_P);
   auto B_over_A = a_times_b_mod_c(B, inv_A, DL_P);
   auto B_over_A_to_the_a = CryptoPP::ModularExponentiation(B_over_A, a, DL_P);
+  std::cout << "before key generation" << std::endl;
   auto k0 = crypto_driver->AES_generate_key(integer_to_byteblock(B_to_the_a));
   auto k1 = crypto_driver->AES_generate_key(integer_to_byteblock(B_over_A_to_the_a));
+  std::cout << "after key generation" << std::endl;
   auto c0_and_iv0 = crypto_driver->AES_encrypt(k0, m0);
   auto c1_and_iv1 = crypto_driver->AES_encrypt(k1, m1);
 
