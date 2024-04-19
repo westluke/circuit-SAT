@@ -109,6 +109,8 @@ std::string OTDriver::OT_recv(int choice_bit) {
   auto b_and_gb = crypto_driver->DH_initialize();
   auto b = byteblock_to_integer(std::get<1>(b_and_gb));
   auto gb = byteblock_to_integer(std::get<2>(b_and_gb));
+  std::cout << gb << std::endl;
+  std::cout << CryptoPP::ModularExponentiation(DL_G, b, DL_P) << std::endl;
   CryptoPP::Integer pub;
   if (choice_bit) {
     pub = gb;
