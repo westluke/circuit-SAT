@@ -87,7 +87,39 @@ std::string GarblerClient::run(std::vector<int> input) {
  */
 std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
                                                        GarbledLabels labels) {
-  // TODO: implement me!
+  auto gates = std::vector<GarbledGate>();
+
+  for (auto &gate : circuit.gates) {
+    std::vector<CryptoPP::SecByteBlock> entries;
+
+    switch (gate.type) {
+      case GateType::AND_GATE:
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        break;
+      case GateType::XOR_GATE:
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        break;
+      case GateType::NOT_GATE:
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
+        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        break;
+      default:
+        std::cout << "This code should be unreachable, gate type invalid" << std::endl;
+        std::abort();
+    }
+    std::random_shuffle(entries.begin(), entries.end());
+    GarbledGate garbled;
+    garbled.entries = entries;
+    gates.push_back(garbled);
+  }
 }
 
 /**
@@ -95,7 +127,11 @@ std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
  * To generate an individual label, use `generate_label`.
  */
 GarbledLabels GarblerClient::generate_labels(Circuit circuit) {
-  // TODO: implement me!
+  GarbledLabels labels;
+  for (int i = 0; i < circuit.num_wire; i++) {
+    labels.zeros.push_back(GarbledWire{generate_label()});
+    labels.ones.push_back(GarbledWire{generate_label()});
+  }
 }
 
 /**
@@ -107,7 +143,13 @@ GarbledLabels GarblerClient::generate_labels(Circuit circuit) {
 CryptoPP::SecByteBlock GarblerClient::encrypt_label(GarbledWire lhs,
                                                     GarbledWire rhs,
                                                     GarbledWire output) {
-  // TODO: implement me!
+  auto left = crypto_driver->hash_inputs(lhs.value, rhs.value);
+  auto right = output.value;
+  right.CleanGrow(right.size() + LABEL_TAG_LENGTH);
+  assert(left.size() == right.size());
+  SecByteBlock encrypted(right.size());
+  CryptoPP::xorbuf(encrypted, left, right, right.size());
+  return encrypted;
 }
 
 /**

@@ -75,8 +75,67 @@ EvaluatorClient::HandleKeyExchange() {
 std::string EvaluatorClient::run(std::vector<int> input) {
   // Key exchange
   auto keys = this->HandleKeyExchange();
+  auto AES_key = keys.first;
+  auto HMAC_key = keys.second;
 
-  // TODO: implement me!
+  // Receive garbled circuit
+  auto circuit_data_and_ok = crypto_driver->decrypt_and_verify(
+      AES_key, HMAC_key, network_driver->read()
+  );
+  if (!circuit_data_and_ok.second) {
+    network_driver->disconnect();
+    throw std::runtime_error("Invalid MAC");
+  }
+  GarblerToEvaluator_GarbledTables_Message garbled_tables;
+  garbled_tables.deserialize(circuit_data_and_ok.first);
+  auto garbled_gates = garbled_tables.garbled_tables;
+
+  // Receive garbler's input
+  auto garbler_input_data_and_ok = crypto_driver->decrypt_and_verify(
+      AES_key, HMAC_key, network_driver->read()
+  );
+  if (!garbler_input_data_and_ok.second) {
+    network_driver->disconnect();
+    throw std::runtime_error("Invalid MAC");
+  }
+  GarblerToEvaluator_GarblerInputs_Message garbler_inputs;
+  garbler_inputs.deserialize(garbler_input_data_and_ok.first);
+
+  // Retrieve labels for our inputs
+  std::vector<GarbledWire> evaluated_wires = garbler_inputs.garbler_inputs;
+  for (int i = 0; i < input.size(); i++) {
+    auto ot_output = ot_driver->OT_recv(input[i]);
+    evaluated_wires.push_back({string_to_byteblock(ot_output)});
+  }
+
+  // Evaluate circuit
+  for (int i = 0; i < circuit.num_gate; i++) {
+    GarbledGate garbled_gate = garbled_gates[i];
+    Gate gate = circuit.gates[i];
+    auto lhs = garbler_inputs.garbler_inputs[gate.lhs];
+    auto rhs = garbler_inputs.garbler_inputs[gate.rhs];
+    auto output = evaluate_gate(garbled_gate, lhs, rhs);
+    evaluated_wires.push_back(output);
+  }
+
+  // Send final labels
+  EvaluatorToGarbler_FinalLabels_Message final_labels;
+  final_labels.final_labels = evaluated_wires;
+  network_driver->send(
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
+  );
+
+  // Receive final output
+  auto final_output_data_and_ok = crypto_driver->decrypt_and_verify(
+      AES_key, HMAC_key, network_driver->read()
+  );
+  if (!final_output_data_and_ok.second) {
+    network_driver->disconnect();
+    throw std::runtime_error("Invalid MAC");
+  }
+  GarblerToEvaluator_FinalOutput_Message final_output;
+  final_output.deserialize(final_output_data_and_ok.first);
+  return final_output.final_output;
 }
 
 /**
@@ -87,7 +146,16 @@ std::string EvaluatorClient::run(std::vector<int> input) {
  */
 GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
                                            GarbledWire rhs) {
-  // TODO: implement me!
+  auto left = crypto_driver->hash_inputs(lhs.value, rhs.value);
+  auto outbuf = CryptoPP::SecByteBlock(left.size());
+
+  for (auto &entry : gate.entries) {
+    CryptoPP::xorbuf(outbuf, entry, left, left.size());
+    if (verify_decryption(outbuf)) {
+      return {snip_decryption(outbuf)};
+    }
+  }
+  throw std::runtime_error("No valid decryption found among garbled entries");
 }
 
 /**
