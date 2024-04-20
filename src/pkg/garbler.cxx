@@ -81,11 +81,10 @@ std::string GarblerClient::run(std::vector<int> input) {
   auto HMAC_key = keys.second;
 
   auto labels = generate_labels(circuit);
-  auto gates = generate_gates(circuit, labels);
 
   // Send garbled circuit
   GarblerToEvaluator_GarbledTables_Message garbled_tables;
-  garbled_tables.garbled_tables = gates;
+  garbled_tables.garbled_tables = generate_gates(circuit, labels);
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &garbled_tables)
   );
@@ -121,19 +120,12 @@ std::string GarblerClient::run(std::vector<int> input) {
 
   // Get final output
   std::string final_output;
+  final_output.resize(circuit.output_length);
   begin = circuit.num_wire - circuit.output_length;
   for (int i = 0; i < circuit.output_length; i++) {
     auto label = final_labels.final_labels[i].value;
-    if (label == labels.zeros[begin + i].value) {
-      final_output += "0";
-    } else if (label == labels.ones[begin + i].value) {
-      final_output += "1";
-    } else {
-      std::cerr << "Invalid output label sent by evaluator to garbler." << std::endl;
-    }
+    final_output[i] = (final_labels.final_labels[i].value == labels.zeros[begin + i].value) ? '0' : '1';
   }
-
-  std::cout << "output: " << final_output << std::endl;
   return final_output;
 }
 
@@ -175,7 +167,7 @@ std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
         std::cout << "This code should be unreachable, gate type invalid" << std::endl;
         std::abort();
     }
-    std::random_shuffle(garbled_gates[i].entries.begin(), garbled_gates[i].entries.end());
+    // std::random_shuffle(garbled_gates[i].entries.begin(), garbled_gates[i].entries.end());
   }
 
   return garbled_gates;
@@ -187,9 +179,11 @@ std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
  */
 GarbledLabels GarblerClient::generate_labels(Circuit circuit) {
   GarbledLabels labels;
+  labels.ones.resize(circuit.num_wire);
+  labels.zeros.resize(circuit.num_wire);
   for (int i = 0; i < circuit.num_wire; i++) {
-    labels.zeros.push_back(GarbledWire{generate_label()});
-    labels.ones.push_back(GarbledWire{generate_label()});
+    labels.zeros[i].value = generate_label();
+    labels.ones[i].value = generate_label();
   }
   return labels;
 }

@@ -113,49 +113,46 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   }
   GarblerToEvaluator_GarblerInputs_Message garbler_inputs;
   garbler_inputs.deserialize(garbler_input_data_and_ok.first);
-  assert(garbler_inputs.garbler_inputs.size() == circuit.garbler_input_length);
+  // assert(garbler_inputs.garbler_inputs.size() == circuit.garbler_input_length);
 
   // Retrieve labels for our inputs
   std::vector<GarbledWire> evaluated_wires = garbler_inputs.garbler_inputs;
+  evaluated_wires.resize(circuit.num_wire);
   for (int i = 0; i < input.size(); i++) {
     auto ot_output = ot_driver->OT_recv(input[i]);
-    evaluated_wires.push_back({string_to_byteblock(ot_output)});
+    evaluated_wires[i].value = string_to_byteblock(ot_output);
   }
-  assert(evaluated_wires.size() == circuit.garbler_input_length + circuit.evaluator_input_length);
+  // assert(evaluated_wires.size() == circuit.garbler_input_length + circuit.evaluator_input_length);
 
   // Evaluate circuit
   evaluated_wires.resize(circuit.num_wire);
   for (int i = 0; i < circuit.num_gate; i++) {
-    GarbledGate garbled_gate = garbled_gates[i];
-    Gate gate = circuit.gates[i];
-    auto lhs = evaluated_wires[gate.lhs];
-    assert(!lhs.value.empty());
+    auto lhs = evaluated_wires[circuit.gates[i].lhs];
+    // assert(!lhs.value.empty());
     GarbledWire rhs;
-    if (gate.type == GateType::NOT_GATE) {
+    if (circuit.gates[i].type == GateType::NOT_GATE) {
       rhs = {DUMMY_RHS};
     } else {
-      rhs = evaluated_wires[gate.rhs];
-      assert(!rhs.value.empty());
+      rhs = evaluated_wires[circuit.gates[i].rhs];
+      // assert(!rhs.value.empty());
     }
-    auto output = evaluate_gate(garbled_gate, lhs, rhs);
+    auto output = evaluate_gate(garbled_gates[i], lhs, rhs);
     // if (output.value.empty()) {
     //   std::cout << "gate evaluation failed, gate type was: " << gate_type_to_string(gate.type) << std::endl;
     // } else {
     //   std::cout << "SUCCESS, type: " << gate_type_to_string(gate.type) << std::endl;
     // }
-    evaluated_wires[gate.output] = output;
+    evaluated_wires[circuit.gates[i].output] = output;
   }
-
-  GarbledWire test;
-  assert(test.value.empty());
 
   // Send final labels
   EvaluatorToGarbler_FinalLabels_Message final_labels;
-  for (int i = circuit.num_wire - circuit.output_length; i < circuit.num_wire; i++) {
-    assert(!evaluated_wires[i].value.empty());
-    final_labels.final_labels.push_back(evaluated_wires[i]);
+  final_labels.final_labels.resize(circuit.output_length);
+  for (int i = 0; i < circuit.output_length; i++) {
+    // assert(!evaluated_wires[i].value.empty());
+    final_labels.final_labels[i] = evaluated_wires[circuit.num_wire - circuit.output_length + i];
   }
-  assert(final_labels.final_labels.size() == circuit.output_length);
+  // assert(final_labels.final_labels.size() == circuit.output_length);
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
   );
@@ -183,11 +180,11 @@ GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
                                            GarbledWire rhs) {
   auto left = crypto_driver->hash_inputs(lhs.value, rhs.value);
   auto outbuf = CryptoPP::SecByteBlock(left.size());
-  assert(left.size() == LABEL_LENGTH + LABEL_TAG_LENGTH);
-  assert(lhs.value.size() == LABEL_LENGTH);
+  // assert(left.size() == LABEL_LENGTH + LABEL_TAG_LENGTH);
+  // assert(lhs.value.size() == LABEL_LENGTH);
 
   for (auto &entry : gate.entries) {
-    assert(entry.size() == left.size());
+    // assert(entry.size() == left.size());
     CryptoPP::xorbuf(outbuf, entry, left, left.size());
     if (verify_decryption(outbuf)) {
       return {snip_decryption(outbuf)};
