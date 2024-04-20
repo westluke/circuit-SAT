@@ -115,6 +115,8 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   garbler_inputs.deserialize(garbler_input_data_and_ok.first);
   // assert(garbler_inputs.garbler_inputs.size() == circuit.garbler_input_length);
 
+  std::cout << "Starting OT..." << std::endl;
+
   // Retrieve labels for our inputs
   std::vector<GarbledWire> evaluated_wires = garbler_inputs.garbler_inputs;
   evaluated_wires.resize(circuit.num_wire);
@@ -122,6 +124,8 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     auto ot_output = ot_driver->OT_recv(input[i]);
     evaluated_wires[circuit.garbler_input_length + i].value = string_to_byteblock(ot_output);
   }
+
+  std::cout << "Finished OT, starting circuit evaluation..." << std::endl;
   // assert(evaluated_wires.size() == circuit.garbler_input_length + circuit.evaluator_input_length);
 
   // Evaluate circuit
@@ -145,6 +149,8 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     evaluated_wires[circuit.gates[i].output] = output;
   }
 
+  std::cout << "Finished circuit evaluation, sending final labels..." << std::endl;
+
   // Send final labels
   EvaluatorToGarbler_FinalLabels_Message final_labels;
   final_labels.final_labels.resize(circuit.output_length);
@@ -156,6 +162,8 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
   );
+
+  std::cout << "Finished sending final labels, waiting on final output..." << std::endl;
 
   // Receive final output
   auto final_output_data_and_ok = crypto_driver->decrypt_and_verify(
