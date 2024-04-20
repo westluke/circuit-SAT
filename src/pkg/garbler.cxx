@@ -127,6 +127,14 @@ std::string GarblerClient::run(std::vector<int> input) {
     auto label = final_labels.final_labels[i].value;
     final_output[i] = (final_labels.final_labels[i].value == labels.zeros[begin + i].value) ? '0' : '1';
   }
+
+  // send final output back to evaluator
+  GarblerToEvaluator_FinalOutput_Message final_output_msg;
+  final_output_msg.final_output = final_output;
+  network_driver->send(
+    crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_output_msg)
+  );
+
   return final_output;
 }
 
