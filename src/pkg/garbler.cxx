@@ -98,12 +98,11 @@ std::string GarblerClient::run(std::vector<int> input) {
   );
 
   // Send evaluator's input labels using OT
-  std::vector<std::string> ot_outputs;
   int begin = circuit.garbler_input_length;
   for (int i = 0; i < circuit.evaluator_input_length; i++) {
     ot_driver->OT_send(
-      byteblock_to_string(labels.zeros[i].value),
-      byteblock_to_string(labels.ones[i].value)
+      byteblock_to_string(labels.zeros[begin + i].value),
+      byteblock_to_string(labels.ones[begin + i].value)
     );
   }
 
