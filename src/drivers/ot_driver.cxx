@@ -48,7 +48,7 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   auto a = byteblock_to_integer(std::get<1>(dh_and_a_and_ga));
   auto A = byteblock_to_integer(std::get<2>(dh_and_a_and_ga));
   SenderToReceiver_OTPublicValue_Message public_value;
-  public_value.public_value = integer_to_byteblock(A);
+  public_value.public_value = std::get<2>(dh_and_a_and_ga);
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &public_value)
   );
@@ -65,10 +65,10 @@ void OTDriver::OT_send(std::string m0, std::string m1) {
   auto inv_A = CryptoPP::EuclideanMultiplicativeInverse(A, DL_P);
   auto B_over_A = a_times_b_mod_c(B, inv_A, DL_P);
   auto k0 = crypto_driver->AES_generate_key(
-    crypto_driver->DH_generate_shared_key(dh, integer_to_byteblock(a), integer_to_byteblock(B))
+    crypto_driver->DH_generate_shared_key(dh, std::get<1>(dh_and_a_and_ga), receiver_public_value.public_value)
   );
   auto k1 = crypto_driver->AES_generate_key(
-    crypto_driver->DH_generate_shared_key(dh, integer_to_byteblock(a), integer_to_byteblock(B_over_A))
+    crypto_driver->DH_generate_shared_key(dh, std::get<1>(dh_and_a_and_ga), integer_to_byteblock(B_over_A))
   );
   auto c0_and_iv0 = crypto_driver->AES_encrypt(k0, m0);
   auto c1_and_iv1 = crypto_driver->AES_encrypt(k1, m1);

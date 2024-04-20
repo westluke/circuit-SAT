@@ -143,36 +143,42 @@ std::string GarblerClient::run(std::vector<int> input) {
  */
 std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
                                                        GarbledLabels labels) {
-  auto gates = std::vector<GarbledGate>();
+  auto garbled_gates = std::vector<GarbledGate>();
+  garbled_gates.resize(circuit.gates.size());
 
-  for (auto &gate : circuit.gates) {
-    GarbledGate garbled;
-    switch (gate.type) {
+  for (int i = 0; i < circuit.gates.size(); i++) {
+    auto left_zero = labels.zeros[circuit.gates[i].lhs];
+    auto left_one = labels.ones[circuit.gates[i].lhs];
+    auto right_zero = labels.zeros[circuit.gates[i].rhs];
+    auto right_one = labels.ones[circuit.gates[i].rhs];
+    auto out_zero = labels.zeros[circuit.gates[i].output];
+    auto out_one = labels.ones[circuit.gates[i].output];
+
+    switch (circuit.gates[i].type) {
       case GateType::AND_GATE:
-        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        garbled_gates[i].entries.push_back(encrypt_label(left_zero, right_zero, out_zero));
+        garbled_gates[i].entries.push_back(encrypt_label(left_zero, right_one, out_zero));
+        garbled_gates[i].entries.push_back(encrypt_label(left_one, right_zero, out_zero));
+        garbled_gates[i].entries.push_back(encrypt_label(left_one, right_one, out_one));
         break;
       case GateType::XOR_GATE:
-        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        garbled_gates[i].entries.push_back(encrypt_label(left_zero, right_zero, out_zero));
+        garbled_gates[i].entries.push_back(encrypt_label(left_one, right_zero, out_one));
+        garbled_gates[i].entries.push_back(encrypt_label(left_zero, right_one, out_one));
+        garbled_gates[i].entries.push_back(encrypt_label(left_one, right_one, out_zero));
         break;
       case GateType::NOT_GATE:
-        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], {DUMMY_RHS}, labels.ones[gate.output]));
-        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], {DUMMY_RHS}, labels.zeros[gate.output]));
+        garbled_gates[i].entries.push_back(encrypt_label(left_zero, {DUMMY_RHS}, out_one));
+        garbled_gates[i].entries.push_back(encrypt_label(left_one, {DUMMY_RHS}, out_zero));
         break;
       default:
         std::cout << "This code should be unreachable, gate type invalid" << std::endl;
         std::abort();
     }
-    std::random_shuffle(garbled.entries.begin(), garbled.entries.end());
-    gates.push_back(garbled);
+    std::random_shuffle(garbled_gates[i].entries.begin(), garbled_gates[i].entries.end());
   }
 
-  return gates;
+  return garbled_gates;
 }
 
 /**
@@ -200,10 +206,10 @@ CryptoPP::SecByteBlock GarblerClient::encrypt_label(GarbledWire lhs,
   auto left = crypto_driver->hash_inputs(lhs.value, rhs.value);
   auto right = output.value;
   right.CleanGrow(right.size() + LABEL_TAG_LENGTH);
-  assert(left.size() == right.size());
-  SecByteBlock encrypted(right.size());
-  CryptoPP::xorbuf(encrypted, left, right, right.size());
-  return encrypted;
+  // assert(left.size() == right.size());
+  // SecByteBlock encrypted(right.size());
+  CryptoPP::xorbuf(left, right, right.size());
+  return left;
 }
 
 /**
