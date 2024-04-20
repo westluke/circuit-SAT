@@ -112,10 +112,12 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   for (int i = 0; i < circuit.num_gate; i++) {
     GarbledGate garbled_gate = garbled_gates[i];
     Gate gate = circuit.gates[i];
-    auto lhs = garbler_inputs.garbler_inputs[gate.lhs];
-    auto rhs = garbler_inputs.garbler_inputs[gate.rhs];
+    auto lhs = evaluated_wires[gate.lhs];
+    GarbledWire rhs;
     if (gate.type == GateType::NOT_GATE) {
       rhs = {DUMMY_RHS};
+    } else {
+      rhs = evaluated_wires[gate.rhs];
     }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
     evaluated_wires.push_back(output);
