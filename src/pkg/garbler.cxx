@@ -134,6 +134,7 @@ std::string GarblerClient::run(std::vector<int> input) {
     }
   }
 
+  std::cout << "output: " << final_output << std::endl;
   return final_output;
 }
 
