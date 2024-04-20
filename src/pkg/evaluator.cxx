@@ -120,7 +120,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   // Retrieve labels for our inputs
   std::vector<GarbledWire> evaluated_wires = garbler_inputs.garbler_inputs;
   evaluated_wires.resize(circuit.num_wire);
-  for (int i = 0; i < input.size(); i++) {
+  for (int i = 0; i < circuit.evaluator_input_length; i++) {
     auto ot_output = ot_driver->OT_recv(input[i]);
     evaluated_wires[circuit.garbler_input_length + i].value = string_to_byteblock(ot_output);
   }
@@ -175,6 +175,8 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   }
   GarblerToEvaluator_FinalOutput_Message final_output;
   final_output.deserialize(final_output_data_and_ok.first);
+
+  std::cout << "Finished receiving final output, returning." << std::endl;
   return final_output.final_output;
 }
 
