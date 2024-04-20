@@ -138,13 +138,16 @@ std::string EvaluatorClient::run(std::vector<int> input) {
       assert(!rhs.value.empty());
     }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
-    if (output.value.empty()) {
-      std::cout << "gate evaluation failed, gate type was: " << gate_type_to_string(gate.type) << std::endl;
-    } else {
-      std::cout << "SUCCESS, type: " << gate_type_to_string(gate.type) << std::endl;
-    }
+    // if (output.value.empty()) {
+    //   std::cout << "gate evaluation failed, gate type was: " << gate_type_to_string(gate.type) << std::endl;
+    // } else {
+    //   std::cout << "SUCCESS, type: " << gate_type_to_string(gate.type) << std::endl;
+    // }
     evaluated_wires[gate.output] = output;
   }
+
+  GarbledWire test;
+  assert(test.value.empty());
 
   // Send final labels
   EvaluatorToGarbler_FinalLabels_Message final_labels;
