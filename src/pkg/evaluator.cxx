@@ -114,6 +114,9 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     Gate gate = circuit.gates[i];
     auto lhs = garbler_inputs.garbler_inputs[gate.lhs];
     auto rhs = garbler_inputs.garbler_inputs[gate.rhs];
+    if (gate.type == GateType::NOT_GATE) {
+      rhs = {DUMMY_RHS};
+    }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
     evaluated_wires.push_back(output);
   }
