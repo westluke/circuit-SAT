@@ -126,7 +126,10 @@ std::string EvaluatorClient::run(std::vector<int> input) {
 
   // Send final labels
   EvaluatorToGarbler_FinalLabels_Message final_labels;
-  final_labels.final_labels = evaluated_wires;
+  final_labels.final_labels = std::vector(
+    evaluated_wires.begin() + circuit.num_wire - circuit.output_length,
+    evaluated_wires.end()
+  );
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
   );
