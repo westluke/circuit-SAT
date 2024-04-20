@@ -106,6 +106,7 @@ std::string GarblerClient::run(std::vector<int> input) {
   }
 
   // Evaluator is evaluating...
+  std::cout << "Waiting on evaluator..." << std::endl;
 
   // Receive final labels
   auto final_labels_data_and_ok = crypto_driver->decrypt_and_verify(
@@ -136,9 +137,9 @@ std::string GarblerClient::run(std::vector<int> input) {
 std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
                                                        GarbledLabels labels) {
   auto garbled_gates = std::vector<GarbledGate>();
-  garbled_gates.resize(circuit.gates.size());
+  garbled_gates.resize(circuit.num_gate);
 
-  for (int i = 0; i < circuit.gates.size(); i++) {
+  for (int i = 0; i < circuit.num_gate; i++) {
     auto left_zero = labels.zeros[circuit.gates[i].lhs];
     auto left_one = labels.ones[circuit.gates[i].lhs];
     auto right_zero = labels.zeros[circuit.gates[i].rhs];
