@@ -59,6 +59,19 @@ EvaluatorClient::HandleKeyExchange() {
   return keys;
 }
 
+std::string gate_type_to_string(GateType::T type) {
+  switch (type) {
+    case GateType::AND_GATE:
+      return "AND_GATE";
+    case GateType::XOR_GATE:
+      return "XOR_GATE";
+    case GateType::NOT_GATE:
+      return "NOT_GATE";
+    default:
+      return "UNKNOWN_GATE";
+  }
+}
+
 /**
  * run. This function should:
  * 1) Receive the garbled circuit and the garbler's input
@@ -121,6 +134,11 @@ std::string EvaluatorClient::run(std::vector<int> input) {
       rhs = evaluated_wires[gate.rhs];
     }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
+    if (output.value == DUMMY_RHS) {
+      std::cout << "gate evaluation failed, gate type was: " << gate_type_to_string(gate.type) << std::endl;
+    } else {
+      std::cout << "SUCCESS, type: " << gate_type_to_string(gate.type) << std::endl;
+    }
     evaluated_wires[gate.output] = output;
   }
 
@@ -168,7 +186,7 @@ GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
     }
   }
 
-  return GarbledWire();
+  return {DUMMY_RHS};
 }
 
 /**
