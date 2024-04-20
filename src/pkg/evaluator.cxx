@@ -109,6 +109,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   }
 
   // Evaluate circuit
+  evaluated_wires.resize(circuit.num_wire);
   for (int i = 0; i < circuit.num_gate; i++) {
     GarbledGate garbled_gate = garbled_gates[i];
     Gate gate = circuit.gates[i];
@@ -120,7 +121,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
       rhs = evaluated_wires[gate.rhs];
     }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
-    evaluated_wires.push_back(output);
+    evaluated_wires[gate.output] = output;
   }
 
   // Send final labels
@@ -153,8 +154,11 @@ GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
                                            GarbledWire rhs) {
   auto left = crypto_driver->hash_inputs(lhs.value, rhs.value);
   auto outbuf = CryptoPP::SecByteBlock(left.size());
+  assert(left.size() == LABEL_LENGTH + LABEL_TAG_LENGTH);
+  assert(lhs.value.size() == LABEL_LENGTH);
 
   for (auto &entry : gate.entries) {
+    assert(entry.size() == left.size());
     CryptoPP::xorbuf(outbuf, entry, left, left.size());
     if (verify_decryption(outbuf)) {
       return {snip_decryption(outbuf)};
