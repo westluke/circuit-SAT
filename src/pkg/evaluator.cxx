@@ -158,7 +158,8 @@ GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
       return {snip_decryption(outbuf)};
     }
   }
-  throw std::runtime_error("No valid decryption found among garbled entries");
+
+  return GarbledWire();
 }
 
 /**
