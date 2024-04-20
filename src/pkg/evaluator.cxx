@@ -113,6 +113,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   }
   GarblerToEvaluator_GarblerInputs_Message garbler_inputs;
   garbler_inputs.deserialize(garbler_input_data_and_ok.first);
+  assert(garbler_inputs.garbler_inputs.size() == circuit.garbler_input_length);
 
   // Retrieve labels for our inputs
   std::vector<GarbledWire> evaluated_wires = garbler_inputs.garbler_inputs;
@@ -120,6 +121,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     auto ot_output = ot_driver->OT_recv(input[i]);
     evaluated_wires.push_back({string_to_byteblock(ot_output)});
   }
+  assert(evaluated_wires.size() == circuit.garbler_input_length + circuit.evaluator_input_length);
 
   // Evaluate circuit
   evaluated_wires.resize(circuit.num_wire);
@@ -127,14 +129,16 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     GarbledGate garbled_gate = garbled_gates[i];
     Gate gate = circuit.gates[i];
     auto lhs = evaluated_wires[gate.lhs];
+    assert(!lhs.value.empty());
     GarbledWire rhs;
     if (gate.type == GateType::NOT_GATE) {
       rhs = {DUMMY_RHS};
     } else {
       rhs = evaluated_wires[gate.rhs];
+      assert(!rhs.value.empty());
     }
     auto output = evaluate_gate(garbled_gate, lhs, rhs);
-    if (output.value == DUMMY_RHS) {
+    if (output.value.empty()) {
       std::cout << "gate evaluation failed, gate type was: " << gate_type_to_string(gate.type) << std::endl;
     } else {
       std::cout << "SUCCESS, type: " << gate_type_to_string(gate.type) << std::endl;
@@ -148,6 +152,7 @@ std::string EvaluatorClient::run(std::vector<int> input) {
     evaluated_wires.begin() + circuit.num_wire - circuit.output_length,
     evaluated_wires.end()
   );
+  assert(final_labels.final_labels.size() == circuit.output_length);
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
   );
@@ -186,7 +191,7 @@ GarbledWire EvaluatorClient::evaluate_gate(GarbledGate gate, GarbledWire lhs,
     }
   }
 
-  return {DUMMY_RHS};
+  return GarbledWire();
 }
 
 /**
