@@ -148,10 +148,10 @@ std::string EvaluatorClient::run(std::vector<int> input) {
 
   // Send final labels
   EvaluatorToGarbler_FinalLabels_Message final_labels;
-  final_labels.final_labels = std::vector(
-    evaluated_wires.begin() + circuit.num_wire - circuit.output_length,
-    evaluated_wires.end()
-  );
+  for (int i = circuit.num_wire - circuit.output_length; i < circuit.num_wire; i++) {
+    assert(!evaluated_wires[i].value.empty());
+    final_labels.final_labels.push_back(evaluated_wires[i]);
+  }
   assert(final_labels.final_labels.size() == circuit.output_length);
   network_driver->send(
     crypto_driver->encrypt_and_tag(AES_key, HMAC_key, &final_labels)
