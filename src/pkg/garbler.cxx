@@ -146,34 +146,29 @@ std::vector<GarbledGate> GarblerClient::generate_gates(Circuit circuit,
   auto gates = std::vector<GarbledGate>();
 
   for (auto &gate : circuit.gates) {
-    std::vector<CryptoPP::SecByteBlock> entries;
-
+    GarbledGate garbled;
     switch (gate.type) {
       case GateType::AND_GATE:
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
         break;
       case GateType::XOR_GATE:
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
         break;
       case GateType::NOT_GATE:
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.zeros[gate.rhs], labels.ones[gate.output]));
-        entries.push_back(encrypt_label(labels.zeros[gate.lhs], labels.ones[gate.rhs], labels.ones[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.zeros[gate.rhs], labels.zeros[gate.output]));
-        entries.push_back(encrypt_label(labels.ones[gate.lhs], labels.ones[gate.rhs], labels.zeros[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.zeros[gate.lhs], {DUMMY_RHS}, labels.ones[gate.output]));
+        garbled.entries.push_back(encrypt_label(labels.ones[gate.lhs], {DUMMY_RHS}, labels.zeros[gate.output]));
         break;
       default:
         std::cout << "This code should be unreachable, gate type invalid" << std::endl;
         std::abort();
     }
-    std::random_shuffle(entries.begin(), entries.end());
-    GarbledGate garbled;
-    garbled.entries = entries;
+    std::random_shuffle(garbled.entries.begin(), garbled.entries.end());
     gates.push_back(garbled);
   }
 
