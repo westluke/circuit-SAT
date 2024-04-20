@@ -120,12 +120,12 @@ std::string EvaluatorClient::run(std::vector<int> input) {
   evaluated_wires.resize(circuit.num_wire);
   for (int i = 0; i < input.size(); i++) {
     auto ot_output = ot_driver->OT_recv(input[i]);
-    evaluated_wires[i].value = string_to_byteblock(ot_output);
+    evaluated_wires[circuit.garbler_input_length + i].value = string_to_byteblock(ot_output);
   }
   // assert(evaluated_wires.size() == circuit.garbler_input_length + circuit.evaluator_input_length);
 
   // Evaluate circuit
-  evaluated_wires.resize(circuit.num_wire);
+  // evaluated_wires.resize(circuit.num_wire);
   for (int i = 0; i < circuit.num_gate; i++) {
     auto lhs = evaluated_wires[circuit.gates[i].lhs];
     // assert(!lhs.value.empty());
