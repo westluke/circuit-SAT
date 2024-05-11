@@ -226,12 +226,305 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
 /**
  * Hash inputs. SHA256(lhs || rhs)
  */
-CryptoPP::SecByteBlock CryptoDriver::hash_inputs(CryptoPP::SecByteBlock &lhs,
-                                                 CryptoPP::SecByteBlock &rhs) {
+CryptoPP::SecByteBlock CryptoDriver::hash(CryptoPP::SecByteBlock to_hash) {
   CryptoPP::SHA256 hash;
   CryptoPP::SecByteBlock digest(hash.DigestSize());
-  CryptoPP::SecByteBlock appended = lhs + rhs;
-  hash.Update(appended.BytePtr(), appended.size());
+  hash.Update(to_hash.BytePtr(), to_hash.size());
   hash.Final(digest.BytePtr());
   return digest;
+}
+
+
+CommitmentReveal CryptoDriver::pedersen_commit(bool secret, CryptoPP::Integer alt_gen) {
+  assert(alt_gen < DL_P);
+  assert(secret < DL_Q);
+  AutoSeededRandomPool prng;
+  CryptoPP::Integer r = CryptoPP::Integer(prng, 0, DL_Q-1);
+  CryptoPP::Integer commitment = a_times_b_mod_c(
+    a_exp_b_mod_c(DL_G, secret, DL_P),
+    a_exp_b_mod_c(alt_gen, r, DL_P),
+    DL_P
+  );
+  CommitmentReveal cr;
+  cr.commitment = commitment;
+  cr.randomness = r;
+  cr.value = secret;
+  return cr;
+}
+
+bool CryptoDriver::pedersen_verify(CommitmentReveal opening, CryptoPP::Integer alt_gen) {
+  assert(opening.commitment < DL_P);
+  assert(alt_gen < DL_P);
+  assert(opening.value < DL_Q);
+  assert(opening.randomness < DL_Q);
+
+  return opening.commitment == a_times_b_mod_c(
+    a_exp_b_mod_c(DL_G, opening.value, DL_P),
+    a_exp_b_mod_c(alt_gen, opening.randomness, DL_P),
+    DL_P
+  );
+}
+
+bool CryptoDriver::schnorr_verify(
+  CryptoPP::Integer exp,
+  CryptoPP::Integer schnorr_first_msg,
+  CryptoPP::Integer challenge,
+  CryptoPP::Integer response
+) {
+  assert(schnorr_first_msg < DL_P);
+  assert(challenge < DL_Q);
+  assert(response < DL_Q);
+
+  return a_exp_b_mod_c(DL_G, response, DL_P) == a_times_b_mod_c(
+    schnorr_first_msg,
+    a_exp_b_mod_c(exp, challenge, DL_P),
+    DL_P
+  );
+}
+
+// From a challenge and a exponentiation, figure out what the schnorr_first_msg and response should be
+// to fool a verifier with that challenge into believing we know the log of the exponentiation
+std::pair<CryptoPP::Integer, CryptoPP::Integer> CryptoDriver::reverse_schnorr(
+  CryptoPP::Integer exp,
+  CryptoPP::Integer commitment,
+  CryptoPP::Integer challenge
+) {
+  assert(exp < DL_P);
+  assert(commitment < DL_P);
+  assert(challenge < DL_Q);
+
+  AutoSeededRandomPool prng;
+  CryptoPP::Integer response(prng, 0, DL_Q-1);
+  CryptoPP::Integer g_inv = DL_G.InverseMod(DL_P);
+
+  CryptoPP::Integer exp_to_the_challenge = a_exp_b_mod_c(exp, challenge, DL_P);
+  CryptoPP::Integer g_to_the_response = a_exp_b_mod_c(DL_G, response, DL_P);
+  CryptoPP::Integer schnorr_first_msg = a_times_b_mod_c(
+    g_to_the_response,
+    exp_to_the_challenge.InverseMod(DL_P),
+    DL_P
+  );
+
+  assert(this->schnorr_verify(
+    exp,
+    schnorr_first_msg,
+    challenge,
+    response
+  ));
+
+  return std::pair(schnorr_first_msg, response);
+}
+
+CryptoPP::Integer CryptoDriver::schnorr_response(
+  CryptoPP::Integer log,
+  CryptoPP::Integer randomness,
+  CryptoPP::Integer challenge
+) {
+  assert(randomness < DL_Q);
+  assert(challenge < DL_Q);
+  return (randomness + challenge * log) % DL_Q;
+}
+
+GateZKP CryptoDriver::GateZKP_gen(
+  CryptoPP::Integer challenge,
+  bool real_lhs, bool real_rhs, bool real_out,
+  CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com
+) {
+  assert(lhs_com.commitment < DL_P);
+  assert(rhs_com.commitment < DL_P);
+  assert(out_com.commitment < DL_P);
+  assert(challenge < DL_Q);
+
+  AutoSeededRandomPool prng;
+
+  GateZKP gate_zkp;
+  CryptoPP::Integer g_inv = DL_G.InverseMod(DL_P);
+
+  CryptoPP::Integer lhs_exp = lhs_com.commitment;
+  CryptoPP::Integer rhs_exp = rhs_com.commitment;
+  CryptoPP::Integer out_exp = out_com.commitment;
+  CryptoPP::Integer lhs_r(prng, 0, DL_Q-1);
+  CryptoPP::Integer rhs_r(prng, 0, DL_Q-1);
+  CryptoPP::Integer out_r(prng, 0, DL_Q-1);
+
+  // If the wires are true, we're not proving knowledge of an h-logarithm for the commitment,
+  // but for the commitment divided by g.
+  if (real_lhs) {
+    lhs_exp = a_times_b_mod_c(lhs_exp, g_inv, DL_P);
+  }
+  if (real_rhs) {
+    rhs_exp = a_times_b_mod_c(rhs_exp, g_inv, DL_P);
+  }
+  if (real_out) {
+    out_exp = a_times_b_mod_c(out_exp, g_inv, DL_P);
+  }
+
+  SchnorrZKP lhs_zkp, rhs_zkp, out_zkp;
+
+  lhs_zkp.claim = real_lhs;
+  lhs_zkp.first_message = a_exp_b_mod_c(DL_G, lhs_r, DL_P);
+  lhs_zkp.response = schnorr_response(lhs_exp, lhs_r, challenge);
+  lhs_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(lhs_zkp.claim)) + integer_to_byteblock(lhs_zkp.first_message);
+
+  rhs_zkp.claim = real_rhs;
+  rhs_zkp.first_message = a_exp_b_mod_c(DL_G, rhs_r, DL_P);
+  rhs_zkp.response = schnorr_response(rhs_exp, rhs_r, challenge);
+  rhs_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(rhs_zkp.claim)) + integer_to_byteblock(rhs_zkp.first_message);
+
+  out_zkp.claim = real_out;
+  out_zkp.first_message = a_exp_b_mod_c(DL_G, out_r, DL_P);
+  out_zkp.response = schnorr_response(out_exp, out_r, challenge);
+  rhs_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(rhs_zkp.claim)) + integer_to_byteblock(rhs_zkp.first_message);
+
+  gate_zkp.zkps.push_back(lhs_zkp);
+  gate_zkp.zkps.push_back(rhs_zkp);
+  gate_zkp.zkps.push_back(out_zkp);
+  gate_zkp.challenge_component = challenge;
+  gate_zkp.hash_component = lhs_zkp.hash_component + rhs_zkp.hash_component + out_zkp.hash_component;
+
+  return gate_zkp;
+}
+
+
+// // Have to generate the REAL zkp later, since we don't know its challenge yet.
+std::vector<GateZKP> CryptoDriver::fakeGateZKP_gen(
+  bool real_lhs, bool real_rhs, bool real_out,
+  CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com
+) {
+  std::vector<GateZKP> zkps;
+  AutoSeededRandomPool prng;
+  int counter = 0;
+  CryptoPP::Integer g_inv = DL_G.InverseMod(DL_P);
+
+  for (int lhs = 0; lhs < 2; lhs++) {
+    for (int rhs = 0; rhs < 2; rhs++) {
+      GateZKP gate_zkp;
+
+      // Generate a set of Schnorr ZKPs for one possible set of inputs, using a random challenge
+      bool out = nand(lhs, rhs);
+      CryptoPP::Integer challenge = CryptoPP::Integer(prng, 0, DL_Q-1);
+      CryptoPP::Integer lhs_exp = lhs_com.commitment;
+      CryptoPP::Integer rhs_exp = rhs_com.commitment;
+      CryptoPP::Integer out_exp = out_com.commitment;
+
+      // If the wires are true, we're not proving knowledge of an h-logarithm for the commitment,
+      // but for the commitment divided by g.
+      if (lhs) {
+        lhs_exp = a_times_b_mod_c(lhs_exp, g_inv, DL_P);
+      }
+      if (rhs) {
+        rhs_exp = a_times_b_mod_c(rhs_exp, g_inv, DL_P);
+      }
+      if (out) {
+        out_exp = a_times_b_mod_c(out_exp, g_inv, DL_P);
+      }
+
+      SchnorrZKP lhs_zkp, rhs_zkp, out_zkp;
+      auto lhs_com_and_response = this->reverse_schnorr(lhs_exp, lhs_com.commitment, challenge);
+      auto rhs_com_and_response = this->reverse_schnorr(rhs_exp, rhs_com.commitment, challenge);
+      auto out_com_and_response = this->reverse_schnorr(out_exp, out_com.commitment, challenge);
+
+      lhs_zkp.claim = lhs;
+      lhs_zkp.first_message = lhs_com_and_response.first;
+      lhs_zkp.response = lhs_com_and_response.second;
+      lhs_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(lhs_zkp.claim)) + integer_to_byteblock(lhs_zkp.first_message);
+
+      rhs_zkp.claim = rhs;
+      rhs_zkp.first_message = rhs_com_and_response.first;
+      rhs_zkp.response = rhs_com_and_response.second;
+      rhs_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(rhs_zkp.claim)) + integer_to_byteblock(rhs_zkp.first_message);
+
+      out_zkp.claim = out;
+      out_zkp.first_message = out_com_and_response.first;
+      out_zkp.response = out_com_and_response.second;
+      out_zkp.hash_component = integer_to_byteblock(CryptoPP::Integer(out_zkp.claim)) + integer_to_byteblock(out_zkp.first_message);
+
+      gate_zkp.zkps.push_back(lhs_zkp);
+      gate_zkp.zkps.push_back(rhs_zkp);
+      gate_zkp.zkps.push_back(out_zkp);
+      gate_zkp.challenge_component = challenge;
+      gate_zkp.hash_component = lhs_zkp.hash_component + rhs_zkp.hash_component + out_zkp.hash_component;
+
+      zkps.push_back(gate_zkp);
+    }
+  }
+
+  return zkps;
+}
+
+bool CryptoDriver::GateZKP_verify(
+  GateZKP zkp, CryptoPP::Integer lhs_com, CryptoPP::Integer rhs_com, CryptoPP::Integer out_com
+) {
+  CryptoPP::SecByteBlock to_hash;
+  std::vector<CryptoPP::Integer> coms;
+  coms.push_back(lhs_com);
+  coms.push_back(rhs_com);
+  coms.push_back(out_com);
+
+  for (int i = 0; i < 3; i++) {
+    CryptoPP::Integer exp = coms[i];
+    to_hash += zkp.zkps[i].hash_component;
+    SchnorrZKP sch = zkp.zkps[i];
+
+    if (sch.claim) {
+      exp = a_times_b_mod_c(exp, DL_G.InverseMod(DL_P), DL_P);
+    }
+
+    if (!this->schnorr_verify(exp, sch.first_message, zkp.challenge_component, sch.response)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+DisjunctiveZKP CryptoDriver::disjunctZKP_gen(
+  bool lhs, bool rhs, bool out,
+  CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com
+) {
+  assert(nand(lhs, rhs) == out);
+  int real_idx = lhs * 2 + rhs;
+  CryptoPP::SecByteBlock to_hash;
+  CryptoPP::Integer fake_challenge_total;
+
+  std::vector<GateZKP> gateZKPs = fakeGateZKP_gen(
+    lhs, rhs, out, lhs_com, rhs_com, out_com
+  );
+
+  for (int i = 0; i < gateZKPs.size(); i++) {
+    to_hash += gateZKPs[i].hash_component;
+    if (i != real_idx) fake_challenge_total += gateZKPs[i].challenge_component;
+  }
+
+  CryptoPP::Integer challenge = byteblock_to_integer(this->hash(to_hash));
+
+  gateZKPs[real_idx] = GateZKP_gen(
+    challenge,
+    lhs, rhs, out,
+    lhs_com, rhs_com, out_com
+  );
+
+  DisjunctiveZKP disjunct_zkp;
+  disjunct_zkp.zkps = gateZKPs;
+  return disjunct_zkp;
+}
+
+bool CryptoDriver::disjunctZKP_verify(
+  DisjunctiveZKP zkp, CryptoPP::Integer lhs_com, CryptoPP::Integer rhs_com, CryptoPP::Integer out_com
+) {
+  CryptoPP::SecByteBlock to_hash;
+  CryptoPP::Integer challenge_sum = 0;
+  for (int i = 0; i < 4; i++) {
+    to_hash += zkp.zkps[i].hash_component;
+    challenge_sum += zkp.zkps[i].challenge_component;
+    if (!this->GateZKP_verify(zkp.zkps[i], lhs_com, rhs_com, out_com)) {
+      return  false;
+    }
+  }
+
+  if (challenge_sum != byteblock_to_integer(this->hash(to_hash))) {
+    return false;
+  }
+
+  return true;
 }

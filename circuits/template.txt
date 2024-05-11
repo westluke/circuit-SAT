@@ -1,0 +1,4 @@
+#gates #wires
+#public #witness #output=1
+
+#input=2 #output=1 #listinput #listoutput NAND

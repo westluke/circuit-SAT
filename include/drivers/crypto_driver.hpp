@@ -51,6 +51,49 @@ public:
   std::string HMAC_generate(SecByteBlock key, std::string ciphertext);
   bool HMAC_verify(SecByteBlock key, std::string ciphertext, std::string hmac);
 
-  CryptoPP::SecByteBlock hash_inputs(CryptoPP::SecByteBlock &lhs,
-                                     CryptoPP::SecByteBlock &rhs);
+  CryptoPP::SecByteBlock hash(CryptoPP::SecByteBlock to_hash);
+
+  CommitmentReveal pedersen_commit(bool secret, CryptoPP::Integer alt_gen);
+  bool pedersen_verify(CommitmentReveal opening, CryptoPP::Integer alt_gen);
+
+  bool schnorr_verify(
+    CryptoPP::Integer exp,
+    CryptoPP::Integer schnorr_first_msg,
+    CryptoPP::Integer challenge,
+    CryptoPP::Integer response
+  );
+
+  std::pair<CryptoPP::Integer, CryptoPP::Integer> reverse_schnorr(
+    CryptoPP::Integer exp,
+    CryptoPP::Integer commitment,
+    CryptoPP::Integer challenge
+  );
+
+  CryptoPP::Integer schnorr_response(
+    CryptoPP::Integer log,
+    CryptoPP::Integer randomness,
+    CryptoPP::Integer challenge
+  );
+
+  GateZKP GateZKP_gen(
+    CryptoPP::Integer challenge,
+    bool real_lhs, bool real_rhs, bool real_out,
+    CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com);
+
+  std::vector<GateZKP> fakeGateZKP_gen(
+    bool real_lhs, bool real_rhs, bool real_out,
+    CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com);
+
+  bool GateZKP_verify(
+    GateZKP zkp, CryptoPP::Integer lhs_com, CryptoPP::Integer rhs_com, CryptoPP::Integer out_com
+  );
+
+  DisjunctiveZKP disjunctZKP_gen(
+    bool lhs, bool rhs, bool out,
+    CommitmentReveal lhs_com, CommitmentReveal rhs_com, CommitmentReveal out_com
+  );
+
+  bool disjunctZKP_verify(
+    DisjunctiveZKP zkp, CryptoPP::Integer lhs_com, CryptoPP::Integer rhs_com, CryptoPP::Integer out_com
+  );
 };

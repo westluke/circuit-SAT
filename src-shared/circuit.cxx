@@ -12,27 +12,25 @@ Circuit parse_circuit(std::string filename) {
   // Open file, scan header.
   FILE *f = fopen(filename.c_str(), "r");
   (void)fscanf(f, "%d%d\n", &circuit.num_gate, &circuit.num_wire);
-  (void)fscanf(f, "%d%d%d\n", &circuit.garbler_input_length,
-               &circuit.evaluator_input_length, &circuit.output_length);
+
+  // We now skip the third parameter, since the output length is always 1.
+  (void)fscanf(f, "%d%d%*d\n", &circuit.public_input_length,
+               &circuit.witness_input_length);
   (void)fscanf(f, "\n");
 
   // Scan gates.
   circuit.gates.resize(circuit.num_gate);
-  int tmp, lhs, rhs, output;
-  char str[10];
+  int lhs, rhs, output;
   for (int i = 0; i < circuit.num_gate; ++i) {
-    (void)fscanf(f, "%d", &tmp);
-    if (tmp == 2) {
-      (void)fscanf(f, "%d%d%d%d%s", &tmp, &lhs, &rhs, &output, str);
-      if (str[0] == 'A')
-        circuit.gates[i] = {GateType::AND_GATE, lhs, rhs, output};
-      else if (str[0] == 'X')
-        circuit.gates[i] = {GateType::XOR_GATE, lhs, rhs, output};
-    } else if (tmp == 1) {
-      (void)fscanf(f, "%d%d%d%s", &tmp, &lhs, &output, str);
-      circuit.gates[i] = {GateType::NOT_GATE, lhs, 0, output};
-    }
+    (void)fscanf(f, "%d%d%d", &lhs, &rhs, &output);
+    circuit.gates[i] = {lhs, rhs, output};
   }
+
+  std::cout << "Parsed circuit with " << circuit.num_gate << " gates and "
+            << circuit.num_wire << " wires." << std::endl;
+  std::cout << "Public input length: " << circuit.public_input_length
+            << std::endl;
+  std::cout << "Witness input length: " << circuit.witness_input_length;
 
   return circuit;
 }

@@ -14,6 +14,8 @@
 #include <crypto++/misc.h>
 #include <crypto++/sha.h>
 
+bool nand(bool a, bool b);
+
 // String <=> Vec<char>.
 std::string chvec2str(std::vector<unsigned char> data);
 std::vector<unsigned char> str2chvec(std::string s);
@@ -39,4 +41,4 @@ void print_key_as_hex(const CryptoPP::SecByteBlock &block);
 std::vector<std::string> string_split(std::string str, char delimiter);
 
 // Input parser.
-std::vector<int> parse_input(std::string input_file);
+std::vector<bool> parse_input(std::string input_file);

@@ -36,6 +36,3 @@ const CryptoPP::Integer DL_G =
                       "5E2327CFEF98C582664B4C0F6CC41659");
 const CryptoPP::Integer DL_Q = CryptoPP::Integer(
     "0x8CF83642A709A097B447997640129DA299B1A47D1EB3750BA308B0FE64F5FBD3");
-
-const CryptoPP::SecByteBlock DUMMY_RHS =
-    CryptoPP::SecByteBlock(NULL, LABEL_LENGTH);

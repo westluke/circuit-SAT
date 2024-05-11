@@ -153,235 +153,91 @@ int DHPublicValue_Message::deserialize(std::vector<unsigned char> &data) {
 }
 
 // ================================================
-// OBLIVIOUS TRANSFER
+// ZKP
 // ================================================
 
-void SenderToReceiver_OTPublicValue_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::SenderToReceiver_OTPublicValue_Message);
-
-  // Add fields.
-  std::string public_integer = byteblock_to_string(this->public_value);
-  put_string(public_integer, data);
+void SchnorrZKP::serialize(std::vector<unsigned char> &data) {
+  data.push_back((char)MessageType::SchnorrZKP_Struct);
+  put_bool(this->claim, data);
+  put_integer(this->first_message, data);
+  put_integer(this->response, data);
+  put_string(byteblock_to_string(this->hash_component), data);
 }
 
-int SenderToReceiver_OTPublicValue_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::SenderToReceiver_OTPublicValue_Message);
-
-  // Get fields.
-  std::string public_integer;
+int SchnorrZKP::deserialize(std::vector<unsigned char> &data) {
+  assert(data[0] == MessageType::SchnorrZKP_Struct);
   int n = 1;
-  n += get_string(&public_integer, data, n);
-  this->public_value = string_to_byteblock(public_integer);
+  n += get_bool(&this->claim, data, n);
+  n += get_integer(&this->first_message, data, n);
+  n += get_integer(&this->response, data, n);
+
+  std::string hash_comp;
+  n += get_string(&hash_comp, data, n);
+  this->hash_component = string_to_byteblock(hash_comp);
   return n;
 }
 
-void ReceiverToSender_OTPublicValue_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::ReceiverToSender_OTPublicValue_Message);
+void GateZKP::serialize(std::vector<unsigned char> &data) {
+  return;
+  // data.push_back((char)MessageType::SchnorrZKP_Struct);
 
-  // Add fields.
-  std::string public_integer = byteblock_to_string(this->public_value);
-  put_string(public_integer, data);
+  // std::vector<unsigned char>* slice = &data;
+  // data.
+  // for (int i = 0; i < 3; i++) {
+
+  // }
+  // put_bool(this->claim, data);
+  // put_integer(this->first_message, data);
+  // put_integer(this->response, data);
+  // put_string(byteblock_to_string(this->hash_component), data);
 }
 
-int ReceiverToSender_OTPublicValue_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::ReceiverToSender_OTPublicValue_Message);
-
-  // Get fields.
-  std::string public_integer;
-  int n = 1;
-  n += get_string(&public_integer, data, n);
-  this->public_value = string_to_byteblock(public_integer);
-  return n;
+int GateZKP::deserialize(std::vector<unsigned char> &data) {
+  return 0;
 }
 
-void SenderToReceiver_OTEncryptedValues_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::SenderToReceiver_OTEncryptedValues_Message);
-
-  // Add fields.
-  put_string(this->e0, data);
-  put_string(this->e1, data);
-
-  std::string iv0 = byteblock_to_string(this->iv0);
-  put_string(iv0, data);
-  std::string iv1 = byteblock_to_string(this->iv1);
-  put_string(iv1, data);
+void DisjunctiveZKP::serialize(std::vector<unsigned char> &data) {
+  return;
 }
 
-int SenderToReceiver_OTEncryptedValues_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::SenderToReceiver_OTEncryptedValues_Message);
-
-  // Get fields.
-  int n = 1;
-  n += get_string(&this->e0, data, n);
-  n += get_string(&this->e1, data, n);
-
-  std::string iv0;
-  n += get_string(&iv0, data, n);
-  this->iv0 = string_to_byteblock(iv0);
-
-  std::string iv1;
-  n += get_string(&iv1, data, n);
-  this->iv1 = string_to_byteblock(iv1);
-  return n;
+int DisjunctiveZKP::deserialize(std::vector<unsigned char> &data) {
+  return 0;
 }
 
-// ================================================
-// GARBLED CIRCUITS
-// ================================================
-
-void GarblerToEvaluator_GarbledTables_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::GarblerToEvaluator_GarbledTables_Message);
-
-  // Put length of garbled tables.
-  int idx = data.size();
-  data.resize(idx + sizeof(size_t));
-  size_t num_tables = this->garbled_tables.size();
-  std::memcpy(&data[idx], &num_tables, sizeof(size_t));
-
-  // Put each table.
-  for (int i = 0; i < num_tables; i++) {
-    // Put num entries.
-    CryptoPP::Integer num_entries = this->garbled_tables[i].entries.size();
-    put_integer(num_entries, data);
-    for (int j = 0; j < num_entries; j++) {
-      std::string entry =
-          byteblock_to_string(this->garbled_tables[i].entries[j]);
-      put_string(entry, data);
-    }
-  }
+void CommitmentReveal::serialize(std::vector<unsigned char> &data) {
+  return;
 }
 
-int GarblerToEvaluator_GarbledTables_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::GarblerToEvaluator_GarbledTables_Message);
-
-  // Get length
-  size_t num_tables;
-  std::memcpy(&num_tables, &data[1], sizeof(size_t));
-
-  // Get fields.
-  int n = 1 + sizeof(size_t);
-  for (int i = 0; i < num_tables; i++) {
-    GarbledGate gate;
-    CryptoPP::Integer num_entries;
-    n += get_integer(&num_entries, data, n);
-    for (int j = 0; j < num_entries; j++) {
-      std::string entry;
-      n += get_string(&entry, data, n);
-      gate.entries.push_back(string_to_byteblock(entry));
-    }
-    this->garbled_tables.push_back(gate);
-  }
-  return n;
+int CommitmentReveal::deserialize(std::vector<unsigned char> &data) {
+  return 0;
 }
 
-void GarblerToEvaluator_GarblerInputs_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::GarblerToEvaluator_GarblerInputs_Message);
-
-  // Put length of garbled inputs.
-  int idx = data.size();
-  data.resize(idx + sizeof(size_t));
-  size_t num_inputs = this->garbler_inputs.size();
-  std::memcpy(&data[idx], &num_inputs, sizeof(size_t));
-
-  // Put each table.
-  for (int i = 0; i < num_inputs; i++) {
-    std::string entry = byteblock_to_string(this->garbler_inputs[i].value);
-    put_string(entry, data);
-  }
+void VerifierToProver_AlternateGenerator_Message::serialize(std::vector<unsigned char> &data) {
+  return;
 }
 
-int GarblerToEvaluator_GarblerInputs_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::GarblerToEvaluator_GarblerInputs_Message);
-
-  // Get length
-  size_t num_inputs;
-  std::memcpy(&num_inputs, &data[1], sizeof(size_t));
-
-  // Get fields.
-  int n = 1 + sizeof(size_t);
-  this->garbler_inputs.resize(num_inputs);
-  for (int i = 0; i < num_inputs; i++) {
-    std::string entry;
-    n += get_string(&entry, data, n);
-    this->garbler_inputs[i].value = string_to_byteblock(entry);
-  }
-  return n;
+int VerifierToProver_AlternateGenerator_Message::deserialize(std::vector<unsigned char> &data) {
+  return 0;
 }
 
-void EvaluatorToGarbler_FinalLabels_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::EvaluatorToGarbler_FinalLabels_Message);
-
-  // Put length of garbled inputs.
-  int idx = data.size();
-  data.resize(idx + sizeof(size_t));
-  size_t num_labels = this->final_labels.size();
-  std::memcpy(&data[idx], &num_labels, sizeof(size_t));
-
-  // Put each table.
-  for (int i = 0; i < num_labels; i++) {
-    std::string entry = byteblock_to_string(this->final_labels[i].value);
-    put_string(entry, data);
-  }
+void ProverToVerifier_NIZK_Message::serialize(std::vector<unsigned char> &data) {
+  return;
 }
 
-int EvaluatorToGarbler_FinalLabels_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::EvaluatorToGarbler_FinalLabels_Message);
-
-  // Get length
-  size_t num_labels;
-  std::memcpy(&num_labels, &data[1], sizeof(size_t));
-
-  // Get fields.
-  int n = 1 + sizeof(size_t);
-  this->final_labels.resize(num_labels);
-  for (int i = 0; i < num_labels; i++) {
-    std::string entry;
-    n += get_string(&entry, data, n);
-    this->final_labels[i].value = string_to_byteblock(entry);
-  }
-  return n;
+int ProverToVerifier_NIZK_Message::deserialize(std::vector<unsigned char> &data) {
+  return 0;
 }
 
-void GarblerToEvaluator_FinalOutput_Message::serialize(
-    std::vector<unsigned char> &data) {
-  // Add message type.
-  data.push_back((char)MessageType::GarblerToEvaluator_FinalOutput_Message);
 
-  // Add fields.
-  put_string(this->final_output, data);
-}
 
-int GarblerToEvaluator_FinalOutput_Message::deserialize(
-    std::vector<unsigned char> &data) {
-  // Check correct message type.
-  assert(data[0] == MessageType::GarblerToEvaluator_FinalOutput_Message);
 
-  // Get fields.
-  int n = 1;
-  n += get_string(&this->final_output, data, n);
-  return n;
-}
+
+
+
+
+
+
+
+
+
+

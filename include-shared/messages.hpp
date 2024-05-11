@@ -24,13 +24,12 @@ namespace MessageType {
 enum T {
   HMACTagged_Wrapper = 1,
   DHPublicValue_Message = 2,
-  SenderToReceiver_OTPublicValue_Message = 3,
-  ReceiverToSender_OTPublicValue_Message = 4,
-  SenderToReceiver_OTEncryptedValues_Message = 5,
-  GarblerToEvaluator_GarbledTables_Message = 6,
-  GarblerToEvaluator_GarblerInputs_Message = 7,
-  EvaluatorToGarbler_FinalLabels_Message = 8,
-  GarblerToEvaluator_FinalOutput_Message = 9,
+  VerifierToProver_AlternateGenerator_Message = 3,
+  ProverToVerifier_NIZK_Message = 4,
+  SchnorrZKP_Struct = 5,
+  GateZKP_Struct = 6,
+  DisjunctiveZKP_Struct = 7,
+  CommitmentReveal_Struct = 8
 };
 };
 MessageType::T get_message_type(std::vector<unsigned char> &data);
@@ -80,61 +79,55 @@ struct DHPublicValue_Message : public Serializable {
 };
 
 // ================================================
-// OBLIVIOUS TRANSFER
+// ZKP
 // ================================================
 
-struct SenderToReceiver_OTPublicValue_Message : public Serializable {
-  CryptoPP::SecByteBlock public_value;
+struct SchnorrZKP : public Serializable {
+  bool claim;
+  CryptoPP::Integer first_message;
+  CryptoPP::Integer response;
+  CryptoPP::SecByteBlock hash_component;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);
 };
 
-struct ReceiverToSender_OTPublicValue_Message : public Serializable {
-  CryptoPP::SecByteBlock public_value;
+struct GateZKP : public Serializable {
+  std::vector<SchnorrZKP> zkps;
+  CryptoPP::Integer challenge_component;
+  CryptoPP::SecByteBlock hash_component;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);
 };
 
-struct SenderToReceiver_OTEncryptedValues_Message : public Serializable {
-  std::string e0;
-  std::string e1;
-  // we need to send IVs outputted by AES_encrypt
-  CryptoPP::SecByteBlock iv0;
-  CryptoPP::SecByteBlock iv1;
+struct DisjunctiveZKP : public Serializable {
+  std::vector<GateZKP> zkps;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);
 };
 
-// ================================================
-// GARBLED CIRCUITS
-// ================================================
-
-struct GarblerToEvaluator_GarbledTables_Message : public Serializable {
-  std::vector<GarbledGate> garbled_tables;
+struct CommitmentReveal : public Serializable {
+  CryptoPP::Integer commitment;
+  CryptoPP::Integer randomness;
+  bool value;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);
 };
 
-struct GarblerToEvaluator_GarblerInputs_Message : public Serializable {
-  std::vector<GarbledWire> garbler_inputs;
+struct VerifierToProver_AlternateGenerator_Message : public Serializable {
+  CryptoPP::Integer alternate_generator;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);
 };
 
-struct EvaluatorToGarbler_FinalLabels_Message : public Serializable {
-  std::vector<GarbledWire> final_labels;
-
-  void serialize(std::vector<unsigned char> &data);
-  int deserialize(std::vector<unsigned char> &data);
-};
-
-struct GarblerToEvaluator_FinalOutput_Message : public Serializable {
-  std::string final_output;
+struct ProverToVerifier_NIZK_Message : public Serializable {
+  std::vector<CryptoPP::Integer> commitments;
+  std::vector<CommitmentReveal> openings;
+  std::vector<DisjunctiveZKP> zkps;
 
   void serialize(std::vector<unsigned char> &data);
   int deserialize(std::vector<unsigned char> &data);

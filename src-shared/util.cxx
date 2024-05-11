@@ -1,5 +1,7 @@
 #include "../include-shared/util.hpp"
 
+bool nand(bool a, bool b) { return !(a && b); }
+
 /**
  * Convert char vec to string.
  */
@@ -116,12 +118,12 @@ std::vector<std::string> string_split(std::string str, char delimiter) {
 /**
  * Parse input to circuit
  */
-std::vector<int> parse_input(std::string input_file) {
+std::vector<bool> parse_input(std::string input_file) {
   std::string input_str;
   CryptoPP::FileSource(input_file.c_str(), true,
                        new CryptoPP::StringSink(input_str));
 
-  std::vector<int> res;
+  std::vector<bool> res;
   for (int i = 0; i < input_str.length(); i++) {
     switch (input_str[i]) {
     case '0':
